@@ -144,7 +144,7 @@ pub async fn filter_transfer_logs(
 // transfers can be quickly found by filtering for the `Transfer` ERC20 event.
 
 pub fn sent_to_us(tx: Transaction, our_address: Address) -> Option<(Address, U256)> {
-    println!("[MY_LOG ETH] sent_to_us() {}:{} ",file!(), line!());
+    println!("[MY_LOG ETH] sent_to_us() tx: {:?} our_address: {:?} {}:{}",tx,our_address,file!(), line!());
     if let Some(to) = tx.to {
         if to == our_address {
             Some((tx.from, tx.value))

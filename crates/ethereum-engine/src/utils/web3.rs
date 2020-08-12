@@ -28,6 +28,7 @@ lazy_static! {
 // returned by the corresponding `eth_getTransactionCount`, `eth_estimateGas`,
 // `eth_gasPrice` calls to an Ethereum node.
 pub fn make_tx(to: Address, value: U256, token_address: Option<Address>) -> RawTransaction {
+    println!("[MY_LOG ETH] make_tx() {}:{} ",file!(), line!());
     if let Some(token_address) = token_address {
         // Ethereum contract transactions format:
         // [transfer function selector][`to` padded ][`value` padded]
@@ -143,6 +144,7 @@ pub async fn filter_transfer_logs(
 // transfers can be quickly found by filtering for the `Transfer` ERC20 event.
 
 pub fn sent_to_us(tx: Transaction, our_address: Address) -> Option<(Address, U256)> {
+    println!("[MY_LOG ETH] sent_to_us() {}:{} ",file!(), line!());
     if let Some(to) = tx.to {
         if to == our_address {
             Some((tx.from, tx.value))

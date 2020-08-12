@@ -29,6 +29,7 @@ pub struct RawTransaction {
 impl RawTransaction {
     /// Signs and returns the RLP-encoded transaction
     pub fn sign(&self, private_key: &H256, chain_id: u8) -> Vec<u8> {
+        println!("[MY_LOG ETH] RawTransaction.sign() {}:{} ",file!(), line!());
         let hash = self.hash(chain_id);
         let sig = ecdsa_sign(&hash, &private_key.0, chain_id);
         let mut tx = RlpStream::new();
@@ -42,6 +43,7 @@ impl RawTransaction {
     }
 
     fn hash(&self, chain_id: u8) -> Vec<u8> {
+        println!("[MY_LOG ETH] RawTransaction.hash() {}:{} ",file!(), line!());
         let mut hash = RlpStream::new();
         hash.begin_unbounded_list();
         self.encode(&mut hash);
@@ -53,6 +55,7 @@ impl RawTransaction {
     }
 
     fn encode(&self, s: &mut RlpStream) {
+        println!("[MY_LOG ETH] RawTransaction.encode() {}:{} ",file!(), line!());
         s.append(&self.nonce);
         s.append(&self.gas_price);
         s.append(&self.gas);

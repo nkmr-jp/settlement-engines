@@ -115,16 +115,19 @@ use secrecy::{ExposeSecret, Secret};
 
 impl EthereumLedgerTxSigner for Secret<String> {
     fn sign_raw_tx(&self, tx: RawTransaction, chain_id: u8) -> Vec<u8> {
+        println!("[MY_LOG ETH] EthereumLedgerTxSigner.sign_raw_tx() {}:{} ",file!(), line!());
         tx.sign(&H256::from_str(self.expose_secret()).unwrap(), chain_id)
     }
 
     fn sign_message(&self, message: &[u8]) -> Signature {
+        println!("[MY_LOG ETH] EthereumLedgerTxSigner.sign_message() {}:{} ",file!(), line!());
         let private_key: PrivateKey = self.expose_secret().parse().unwrap();
         let hash = Sha3::digest(message);
         private_key.sign_hash(&hash)
     }
 
     fn address(&self) -> Address {
+        println!("[MY_LOG ETH] EthereumLedgerTxSigner.address() {}:{} ",file!(), line!());
         let private_key: PrivateKey = self.expose_secret().parse().unwrap();
         let address = private_key.to_public_key().unwrap();
         let mut out = [0; 20];

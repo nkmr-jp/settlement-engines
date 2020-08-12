@@ -51,6 +51,7 @@ struct PaymentDetailsRequest {
 
 impl PaymentDetailsRequest {
     fn new(challenge: Vec<u8>) -> Self {
+        println!("[MY_LOG ETH] PaymentDetailsRequest.new() {}:{} ",file!(), line!());
         PaymentDetailsRequest { challenge }
     }
 }
@@ -64,6 +65,7 @@ struct PaymentDetailsResponse {
 
 impl PaymentDetailsResponse {
     fn new(to: Addresses, signature: Signature, challenge: Option<Vec<u8>>) -> Self {
+        println!("[MY_LOG ETH] PaymentDetailsResponse.new() {}:{} ",file!(), line!());
         PaymentDetailsResponse {
             to,
             signature,
@@ -118,6 +120,7 @@ where
     A: EthereumAccount<AccountId = String> + Clone + Send + Sync + 'static,
 {
     pub fn new(store: S, signer: Si) -> Self {
+        println!("[MY_LOG ETH] EthereumLedgerSettlementEngineBuilder.new() {}:{} ",file!(), line!());
         Self {
             store,
             signer,
@@ -259,6 +262,7 @@ where
     /// Settlement Engine's connectors about transactions which are sent to the
     /// engine's address.
     pub fn notify_connector_on_incoming_settlement(&self) {
+        println!("[MY_LOG ETH] EthereumLedgerSettlementEngine.notify_connector_on_incoming_settlement() {}:{} ",file!(), line!());
         let this = self.clone();
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(this.poll_frequency);
@@ -293,6 +297,7 @@ where
     // only makes 1 transaction per accountId with the
     // appropriate amount.
     pub async fn handle_received_transactions(&self) -> Result<(), ()> {
+        println!("[MY_LOG ETH] EthereumLedgerSettlementEngine.handle_received_transactions() {}:{} ",file!(), line!());
         let confirmations = self.confirmations;
         let web3 = self.web3.clone();
         let our_address = self.address.own_address;
@@ -448,6 +453,7 @@ where
         amount: String,
         tx_hash: H256,
     ) -> Result<(), ()> {
+        println!("[MY_LOG ETH] EthereumLedgerSettlementEngine.notify_connector() {}:{} ",file!(), line!());
         let engine_scale = self.asset_scale;
         let mut url = self.connector_url.clone();
         url.path_segments_mut()
@@ -799,6 +805,7 @@ where
         account_id: String,
         body: Vec<u8>,
     ) -> Result<ApiResponse, ApiError> {
+        println!("[MY_LOG ETH] SettlementEngine.receive_message() {}:{} ",file!(), line!());
         let address = self.address;
         let store = self.store.clone();
         // We are only returning our information, so
@@ -885,6 +892,7 @@ where
         account_id: String,
         body: Quantity,
     ) -> Result<ApiResponse, ApiError> {
+        println!("[MY_LOG ETH] SettlementEngine.send_money() {}:{} ",file!(), line!());
         let engine_scale = self.asset_scale;
         let connector_scale = body.scale;
 
@@ -1006,6 +1014,7 @@ pub mod redis_bin {
     #[doc(hidden)]
     #[allow(clippy::all)]
     pub async fn run_ethereum_engine(opt: EthereumLedgerOpt) -> Result<(), ()> {
+        println!("[MY_LOG ETH] redis_bin.run_ethereum_engine() {}:{} ",file!(), line!());
         // TODO make key compatible with
         // https://github.com/tendermint/signatory to have HSM sigs
 

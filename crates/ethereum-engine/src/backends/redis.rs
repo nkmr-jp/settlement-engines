@@ -181,6 +181,7 @@ impl EthereumStore for EthereumLedgerRedisStore {
         &self,
         account_ids: Vec<String>,
     ) -> Result<Vec<EthereumAddresses>, ()> {
+        println!("[MY_LOG ETH] EthereumStore.load_account_addresses() {}:{} ",file!(), line!());
         let mut pipe = redis::pipe();
         let mut connection = self.connection.clone();
         for account_id in account_ids.iter() {
@@ -232,6 +233,7 @@ impl EthereumStore for EthereumLedgerRedisStore {
     }
 
     async fn delete_accounts(&self, account_ids: Vec<String>) -> Result<(), ()> {
+        println!("[MY_LOG ETH] EthereumStore.delete_accounts() {}:{} ",file!(), line!());
         let mut pipe = redis::pipe();
         for account_id in account_ids.iter() {
             pipe.del(ethereum_ledger_key(&account_id));
@@ -251,6 +253,7 @@ impl EthereumStore for EthereumLedgerRedisStore {
         &self,
         data: HashMap<String, EthereumAddresses>,
     ) -> Result<(), ()> {
+        println!("[MY_LOG ETH] EthereumStore.save_account_addresses() {}:{} ",file!(), line!());
         let mut pipe = redis::pipe();
         for (account_id, d) in data {
             let token_address = if let Some(token_address) = d.token_address {
@@ -278,6 +281,7 @@ impl EthereumStore for EthereumLedgerRedisStore {
         net_version: String,
         block: U256,
     ) -> Result<(), ()> {
+        println!("[MY_LOG ETH] EthereumStore.save_recently_observed_block() {}:{} ",file!(), line!());
         let mut connection = self.connection.clone();
         connection
             .hset(RECENTLY_OBSERVED_BLOCK_KEY, net_version, block.low_u64())
@@ -287,6 +291,7 @@ impl EthereumStore for EthereumLedgerRedisStore {
     }
 
     async fn load_recently_observed_block(&self, net_version: String) -> Result<Option<U256>, ()> {
+        println!("[MY_LOG ETH] EthereumStore.load_recently_observed_block() {}:{} ",file!(), line!());
         let mut connection = self.connection.clone();
         let block: Option<u64> = connection
             .hget(RECENTLY_OBSERVED_BLOCK_KEY, net_version)
@@ -299,6 +304,7 @@ impl EthereumStore for EthereumLedgerRedisStore {
         &self,
         eth_address: EthereumAddresses,
     ) -> Result<String, ()> {
+        println!("[MY_LOG ETH] EthereumStore.load_account_id_from_address() {}:{} ",file!(), line!());
         let mut connection = self.connection.clone();
         let account_id: Option<String> = connection
             .get(addrs_to_key(eth_address))
@@ -308,6 +314,7 @@ impl EthereumStore for EthereumLedgerRedisStore {
     }
 
     async fn check_if_tx_processed(&self, tx_hash: H256) -> Result<bool, ()> {
+        println!("[MY_LOG ETH] EthereumStore.check_if_tx_processed() {}:{} ",file!(), line!());
         let mut connection = self.connection.clone();
         connection
             .exists(ethereum_transactions_key(tx_hash))
@@ -316,6 +323,7 @@ impl EthereumStore for EthereumLedgerRedisStore {
     }
 
     async fn mark_tx_processed(&self, tx_hash: H256) -> Result<(), ()> {
+        println!("[MY_LOG ETH] EthereumStore.mark_tx_processed() {}:{} ",file!(), line!());
         let mut connection = self.connection.clone();
         let marked_successfully: bool = cmd("SETNX")
             .arg(ethereum_transactions_key(tx_hash))

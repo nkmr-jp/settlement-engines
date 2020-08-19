@@ -636,6 +636,8 @@ where
     /// receival of Ethereum and Token addresses from the peer, it saves them in
     /// the store.
     async fn create_account(&self, account_id: String) -> Result<ApiResponse, ApiError> {
+        println!("[MY_LOG ETH] SettlementEngine.create_account() {}:{} ",file!(), line!());
+        println!("[MY_LOG ETH] account_id: {:?}",account_id);
         // let self_clone = self.clone();
         // let store: S = self.store.clone();
         // let signer = self.signer.clone();
@@ -663,6 +665,11 @@ where
         let body =
             serde_json::to_string(&PaymentDetailsRequest::new(challenge_clone.clone())).unwrap();
         let url_clone = url.clone();
+
+        println!("[MY_LOG ETH] post url: {:?}", url.as_ref());
+        println!("[MY_LOG ETH] header Content-Type: {:?}", "application/octet-stream");
+        println!("[MY_LOG ETH] header Idempotency-Key: {:?}", idempotency_uuid.clone());
+        println!("[MY_LOG ETH] body: {:?}", body.clone());
         let action = move || {
             client
                 .post(url.as_ref())
@@ -690,6 +697,8 @@ where
         let challenge_hash = Sha3::digest(&data);
         let recovered_address = payment_details.signature.recover(&challenge_hash);
         trace!("Received payment details {:?}", payment_details);
+        println!("[MY_LOG ETH] Received payment details {:?}", payment_details);
+
         match recovered_address {
             Ok(recovered_address) => {
                 if recovered_address.as_bytes() != &payment_details.to.own_address.as_bytes()[..] {
@@ -723,6 +732,11 @@ where
             };
             let idempotency_uuid = Uuid::new_v4().to_hyphenated().to_string();
             let client = Client::new();
+
+            println!("[MY_LOG ETH] ACK BACK post url: {:?}", url_clone.as_ref());
+            println!("[MY_LOG ETH] ACK BACK header Content-Type: {:?}", "application/octet-stream");
+            println!("[MY_LOG ETH] ACK BACK header Idempotency-Key: {:?}", idempotency_uuid.clone());
+            println!("[MY_LOG ETH] ACK BACK body: {:?}", resp.clone());
             let action = move || {
                 client
                     .post(url_clone.as_ref())
@@ -763,6 +777,7 @@ where
 
     // Deletes an account from the engine
     async fn delete_account(&self, account_id: String) -> Result<ApiResponse, ApiError> {
+        println!("[MY_LOG ETH] .EthereumLedger.delete_account: {:?} {}:{} ",account_id,file!(), line!());
         let store = self.store.clone();
         let account_id_clone = account_id.clone();
         // Ensure account exists

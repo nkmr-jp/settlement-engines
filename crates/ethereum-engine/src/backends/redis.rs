@@ -254,6 +254,8 @@ impl EthereumStore for EthereumLedgerRedisStore {
         data: HashMap<String, EthereumAddresses>,
     ) -> Result<(), ()> {
         println!("[MY_LOG ETH] EthereumStore.save_account_addresses() {}:{} ",file!(), line!());
+        println!("[MY_LOG ETH] data: {:?}", data);
+
         let mut pipe = redis::pipe();
         for (account_id, d) in data {
             let token_address = if let Some(token_address) = d.token_address {

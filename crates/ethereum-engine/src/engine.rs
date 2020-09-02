@@ -478,10 +478,11 @@ where
             let body = &json!(Quantity::new(amount.clone(), engine_scale));
 
             sinfo!(&LOGGING.logger, "NOTIFY_CONNECTOR_REQUEST";
+                "request_id" => format!("{:?}", request_id),
+                "function" => "EthereumLedgerSettlementEngine.notify_connector()",
                 "HttpRequest_url" => format!("{:?}", url.as_ref()),
                 "HttpRequest_header_Idempotency-Key" => format!("{:?}", tx_hash),
                 "HttpRequest_body" => format!("{:?}", body),
-                "request_id" => format!("{:?}", request_id),
             );
 
             client
@@ -508,9 +509,9 @@ where
             })
             .await?;
         sinfo!(&LOGGING.logger, "NOTIFY_CONNECTOR_RESPONSE";
-                "HttpResponse" => format!("{:?}", ret),
-                "HttpResponse_body" => format!("{:?}", ret),
                 "request_id" => format!("{:?}", request_id),
+                "function" => "EthereumLedgerSettlementEngine.notify_connector()",
+                "HttpResponse" => format!("{:?}", ret),
             );
         trace!("Accounting system responded with {:?}", ret);
         Ok(())

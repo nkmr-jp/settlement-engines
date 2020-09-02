@@ -48,6 +48,11 @@ ethereum-types ="0.6.0"
 warp = "0.2"
 async-trait = "0.1.22"
 
+json-logger = { path = "../json-logger", version = "0.1.0", default-features = false }
+slog = "2.5.2"
+slog-json = "2.3.0"
+slog-async = "2.5.0"
+chrono = "0.4"
 
 [dev-dependencies]
 lazy_static = "1.3"

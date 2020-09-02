@@ -44,6 +44,10 @@ use secrecy::Secret;
 const MAX_RETRIES: usize = 10;
 const ETH_CREATE_ACCOUNT_PREFIX: &[u8] = b"ilp-ethl-create-account-message";
 
+use json_logger::LOGGING;
+use slog::{info as sinfo};
+use chrono;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct PaymentDetailsRequest {
     challenge: Vec<u8>,
@@ -462,16 +466,29 @@ where
             format!("{:?}", tx_hash)
         );
 
+        let request_id = chrono::Local::now().timestamp_nanos(); // debug param
+
         let account_id_clone = account_id.clone();
         let amount_clone = amount.clone();
         let action = move || {
             let client = Client::new();
             let account_id = account_id.clone();
             let amount = amount.clone();
+
+            let body = &json!(Quantity::new(amount.clone(), engine_scale));
+
+            sinfo!(&LOGGING.logger, "NOTIFY_CONNECTOR_REQUEST";
+                "HttpRequest_url" => format!("{:?}", url.as_ref()),
+                "HttpRequest_header_Idempotency-Key" => format!("{:?}", tx_hash),
+                "HttpRequest_body" => format!("{:?}", body),
+                "request_id" => format!("{:?}", request_id),
+            );
+
             client
                 .post(url.as_ref())
                 .header("Idempotency-Key", format!("{:?}", tx_hash))
-                .json(&json!(Quantity::new(amount.clone(), engine_scale)))
+                .header("request_id", format!("{:?}", request_id))
+                .json(body)
                 .send()
                 .map_err(move |err| {
                     error!(
@@ -490,6 +507,11 @@ where
                 error!("Exceeded max retries when notifying connector about account {:?} for amount {:?} and transaction hash {:?}. Please check your API.", account_id_clone, amount_clone, tx_hash)
             })
             .await?;
+        sinfo!(&LOGGING.logger, "NOTIFY_CONNECTOR_RESPONSE";
+                "HttpResponse" => format!("{:?}", ret),
+                "HttpResponse_body" => format!("{:?}", ret),
+                "request_id" => format!("{:?}", request_id),
+            );
         trace!("Accounting system responded with {:?}", ret);
         Ok(())
     }

@@ -525,11 +525,20 @@ where
     /// 2. construct the raw transaction using the nonce and the provided parameters
     /// 3. Sign the transaction (along with the chain id, due to EIP-155)
     /// 4. Submit the RLP-encoded transaction to the network
+    ///
+    /// Ethereum台帳のトランザクションを `to` に `amount` をサブミットするためのヘルパー関数です。
+    /// token_address` を指定して呼ばれた場合は、代わりにERC20トランザクションを作成します。
+    /// トランザクションを自動的に作成して署名するためのAPIがないため、以下のように手動で行う必要があります。
+    /// 1. アカウントのnonceを取得する
+    /// 2. nonce と提供されたパラメータを用いて生のトランザクションを構築します。
+    /// 3. トランザクションに署名する(EIP-155によるチェーンIDと一緒に)
+    /// 4. RLPエンコードされたトランザクションをネットワークに送信します。
     async fn settle_to(
         &self,
         to: Address,
         amount: U256,
         token_address: Option<Address>,
+        request_id: i64,
     ) -> Result<Option<H256>, ()> {
         if amount == U256::from(0) {
             return Ok(None);
@@ -591,6 +600,16 @@ where
 
         let signed_tx = signer.sign_raw_tx(tx.clone(), chain_id); // 3
 
+        // refs: https://eth.wiki/json-rpc/API
+        sinfo!(&LOGGING.logger, "ETH_SUBMIT_TX_REQUEST";
+            "request_id" => format!("{:?}", request_id),
+            "function" => "EthereumLedgerSettlementEngine.settle_to()",
+            "tx" => format!("{:?}", tx),
+            "signed_tx" => format!("{:?}", hex::encode(&signed_tx)),
+            "JsonRPC_method" => "eth_sendRawTransaction",
+            "JsonRPC_execute_code" => "https://github.com/tomusdrw/rust-web3/blob/master/src/api/eth.rs#L291",
+        );
+
         let action = move || {
             trace!("Sending tx to Ethereum: {}", hex::encode(&signed_tx));
             web3.eth() // 4
@@ -610,6 +629,13 @@ where
             error!("Unable to submit tx to Ethereum ledger");
         })
         .await?;
+
+        sinfo!(&LOGGING.logger, "ETH_SUBMIT_TX_RESPONSE";
+            "request_id" => format!("{:?}", request_id),
+            "function" => "EthereumLedgerSettlementEngine.settle_to()",
+            "tx_hash" => format!("{:?}", tx_hash),
+        );
+
         debug!("Transaction submitted. Hash: {:?}", tx_hash);
         Ok(Some(tx_hash))
     }
@@ -903,6 +929,10 @@ where
     /// onchain transaction to the Ethereum Address that corresponds to the
     /// provided account id, for the amount specified in the message's body. If
     /// the account is associated with an ERC20 token, it makes an ERC20 call instead.
+    ///
+    /// 決済エンジンの関数で、/accounts/:id/settlementsのエンドポイント(POST)に対応しています。
+    /// 提供されたアカウントIDに対応するEthereumアドレスに対して、メッセージの本文で指定された金額のEthereumオンチェーントランザクションを実行します。
+    /// アカウントがERC20トークンに関連付けられている場合、代わりにERC20コールを行います。
     async fn send_money(
         &self,
         account_id: String,
@@ -952,6 +982,19 @@ where
             }
         );
 
+        let request_id = chrono::Local::now().timestamp_nanos(); // debug param
+
+        // 送信先と合計を出す
+        sinfo!(&LOGGING.logger, "SETTLEMENT_REQUEST";
+            "request_id" => format!("{:?}", request_id),
+            "function" => "SettlementClient.send_money()",
+            "to_account_id" => format!("{:?}", account_id),
+            "to_eth_address" => format!("{:?}", addresses.own_address),
+            "amount" => format!("{:?}", amount.clone()),
+            "uncredited_settlement_amount" => format!("{:?}", uncredited_settlement_amount.clone()),
+            "total_amount" => format!("{:?}", amount.clone() + uncredited_settlement_amount.clone()),
+        );
+
         // Typecast to web3::U256
         let total_amount = amount + uncredited_settlement_amount;
         let total_amount = match U256::from_dec_str(&total_amount.to_string()) {
@@ -964,7 +1007,7 @@ where
         };
 
         // Execute the settlement
-        self.settle_to(addresses.own_address, total_amount, addresses.token_address)
+        self.settle_to(addresses.own_address, total_amount, addresses.token_address, request_id)
             .map_err(move |_| {
                 let error_msg = "Error connecting to the blockchain.".to_string();
                 error!("{}", error_msg);

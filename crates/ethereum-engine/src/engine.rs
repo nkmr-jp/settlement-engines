@@ -296,6 +296,18 @@ where
     // (accountId=>amount) across all transactions and blocks, and
     // only makes 1 transaction per accountId with the
     // appropriate amount.
+    /// 入金トランザクションをコネクタに通知するためのルーチン。
+    /// アルゴリズム（重く最適化されていない）。
+    /// 1.最後に観測されたブロック番号の取得
+    /// 2.Ethereumから現在のブロック番号を取得する
+    /// 3.最後に観測されたブロック以降のすべてのブロックを $(current block number - confirmations) まで取得します。
+    /// 4.各ブロックごとに（並列に）。
+    ///     各トランザクションに対して（並行して）。
+    ///     1.アドレスに送信されていない場合や、値が0の場合はスキップします。
+    ///     2.ストアから送信者にマッチする ID を取得します。
+    ///     3.コネクタの /accounts/$id/settlements エンドポイントに、トランザクションの値をボディとして POST リクエストを行い、コネクタに通知します。
+    /// この呼び出しは失敗した場合に再試行されます。
+    /// 5.保存 (current block number - confirmations) は、この関数の次回の呼び出し時に最後に観測されたデータとして使用されます。
     pub async fn handle_received_transactions(&self) -> Result<(), ()> {
         let confirmations = self.confirmations;
         let web3 = self.web3.clone();
@@ -310,6 +322,16 @@ where
             .compat()
             .map_err(move |err| error!("Could not fetch current block number {:?}", err))
             .await?;
+
+        let request_id = chrono::Local::now().timestamp_nanos(); // debug param
+
+        sinfo!(&LOGGING.logger, "ETH_BLOCK_NUMBER";
+            "request_id" => format!("{:?}", request_id),
+            "function" => "EthereumLedgerSettlementEngine.handle_received_transactions()",
+            "JsonRPC_method" => "eth_blockNumber", // refs: https://eth.wiki/json-rpc/API
+            "JsonRPC_execute_code" => "https://github.com/tomusdrw/rust-web3/blob/bfdec4/src/api/eth.rs#L38",
+            "Response_current_block" => format!("{:?}", current_block),
+        );
 
         // get the safe number of blocks to avoid reorgs
         let to_block = current_block - confirmations;
@@ -363,6 +385,13 @@ where
                     })
                     .compat()
                     .await?;
+                sinfo!(&LOGGING.logger, "ETH_GET_BLOCK_BY_NUMBER";
+                    "request_id" => format!("{:?}", request_id),
+                    "function" => "EthereumLedgerSettlementEngine.handle_received_transactions()",
+                    "JsonRPC_method" => "eth_getBlockByNumber", // refs: https://eth.wiki/json-rpc/API
+                    "JsonRPC_execute_code" => "https://github.com/tomusdrw/rust-web3/blob/bfdec4/src/api/eth.rs#L132",
+                    "Response_maybe_block" => format!("{:?}", maybe_block),
+                );
                 if let Some(block) = maybe_block {
                     for tx in block.transactions {
                         self.notify_eth_transfer(tx).await?;
@@ -374,6 +403,12 @@ where
         trace!("Processed all transactions up to block {}", to_block);
         // now that all transactions have been processed successfully, we
         // can save `to_block` as the latest observed block
+        sinfo!(&LOGGING.logger, "SAVE_RECENTLY_OBSERVED_BLOCK";
+            "request_id" => format!("{:?}", request_id),
+            "function" => "EthereumLedgerSettlementEngine.handle_received_transactions()",
+            "SaveParam_net_version"=> format!("{:?}", net_version),
+            "SaveParam_to_block"=> format!("{:?}", to_block),
+        );
         self.store
             .save_recently_observed_block(net_version, to_block)
             .await
@@ -562,6 +597,15 @@ where
             .compat()
             .map_err(|err| error!("could not fetch gas price {:?}", err))
             .await?;
+
+        sinfo!(&LOGGING.logger, "ETH_GAS_PRICE";
+            "request_id" => format!("{:?}", request_id),
+            "function" => "EthereumLedgerSettlementEngine.settle_to()",
+            "JsonRPC_method" => "eth_gasPrice", // refs: https://eth.wiki/json-rpc/API
+            "JsonRPC_execute_code" => "https://github.com/tomusdrw/rust-web3/blob/bfdec4/src/api/eth.rs#L86",
+            "Response_gas_amount" => format!("{:?}", gas_price),
+        );
+
         let gas_amount = match web3
             .eth()
             .estimate_gas(
@@ -587,6 +631,14 @@ where
             Ok(amount) => amount,
             Err(_) => U256::from(100_000),
         };
+        sinfo!(&LOGGING.logger, "ETH_ESTIMATE_GAS";
+            "request_id" => format!("{:?}", request_id),
+            "function" => "EthereumLedgerSettlementEngine.settle_to()",
+            "JsonRPC_method" => "eth_estimateGas", // refs: https://eth.wiki/json-rpc/API
+            "JsonRPC_execute_code" => "https://github.com/tomusdrw/rust-web3/blob/bfdec4/src/api/eth.rs#L81",
+            "Response_gas_amount" => format!("{:?}", gas_amount),
+        );
+
         let nonce = web3
             .eth()
             .transaction_count(own_address, Some(BlockNumber::Pending))
@@ -594,21 +646,20 @@ where
             .map_err(|err| error!("could not fetch nonce {:?}", err))
             .await?;
 
+        sinfo!(&LOGGING.logger, "ETH_GET_TRANSACTION_COUNT";
+            "request_id" => format!("{:?}", request_id),
+            "function" => "EthereumLedgerSettlementEngine.settle_to()",
+            "JsonRPC_method" => "eth_getTransactionCount", // refs: https://eth.wiki/json-rpc/API
+            "JsonRPC_execute_code" => "https://github.com/tomusdrw/rust-web3/blob/bfdec4/src/api/eth.rs#L188",
+            "Response_nonce" => format!("{:?}", nonce),
+        );
+
         tx.gas_price = gas_price;
         tx.gas = gas_amount;
         tx.nonce = nonce;
 
         let signed_tx = signer.sign_raw_tx(tx.clone(), chain_id); // 3
-
-        // refs: https://eth.wiki/json-rpc/API
-        sinfo!(&LOGGING.logger, "ETH_SUBMIT_TX_REQUEST";
-            "request_id" => format!("{:?}", request_id),
-            "function" => "EthereumLedgerSettlementEngine.settle_to()",
-            "tx" => format!("{:?}", tx),
-            "signed_tx" => format!("{:?}", hex::encode(&signed_tx)),
-            "JsonRPC_method" => "eth_sendRawTransaction",
-            "JsonRPC_execute_code" => "https://github.com/tomusdrw/rust-web3/blob/master/src/api/eth.rs#L291",
-        );
+        let signed_tx_clone = signed_tx.clone();
 
         let action = move || {
             trace!("Sending tx to Ethereum: {}", hex::encode(&signed_tx));
@@ -630,10 +681,14 @@ where
         })
         .await?;
 
-        sinfo!(&LOGGING.logger, "ETH_SUBMIT_TX_RESPONSE";
+        sinfo!(&LOGGING.logger, "ETH_SEND_RAW_TRANSACTION_REQUEST";
             "request_id" => format!("{:?}", request_id),
             "function" => "EthereumLedgerSettlementEngine.settle_to()",
-            "tx_hash" => format!("{:?}", tx_hash),
+            "tx" => format!("{:?}", tx),
+            "signed_tx" => format!("{:?}", hex::encode(&signed_tx_clone)),
+            "JsonRPC_method" => "eth_sendRawTransaction", // refs: https://eth.wiki/json-rpc/API
+            "JsonRPC_execute_code" => "https://github.com/tomusdrw/rust-web3/blob/bfdec4/src/api/eth.rs#L291",
+            "Response_tx_hash"=> format!("{:?}", tx_hash),
         );
 
         debug!("Transaction submitted. Hash: {:?}", tx_hash);
@@ -982,11 +1037,10 @@ where
             }
         );
 
-        let request_id = chrono::Local::now().timestamp_nanos(); // debug param
+        let trace_id = chrono::Local::now().timestamp_nanos(); // debug param
 
-        // 送信先と合計を出す
         sinfo!(&LOGGING.logger, "SETTLEMENT_REQUEST";
-            "request_id" => format!("{:?}", request_id),
+            "trace_id" => format!("{:?}", trace_id),
             "function" => "SettlementClient.send_money()",
             "to_account_id" => format!("{:?}", account_id),
             "to_eth_address" => format!("{:?}", addresses.own_address),
@@ -1007,7 +1061,7 @@ where
         };
 
         // Execute the settlement
-        self.settle_to(addresses.own_address, total_amount, addresses.token_address, request_id)
+        self.settle_to(addresses.own_address, total_amount, addresses.token_address, trace_id)
             .map_err(move |_| {
                 let error_msg = "Error connecting to the blockchain.".to_string();
                 error!("{}", error_msg);
@@ -1019,6 +1073,14 @@ where
                 ApiError::from_api_error_type(&err_type).detail(error_msg)
             })
             .await?;
+
+
+        sinfo!(&LOGGING.logger, "SAVE_UNCREDITED_SETTLEMENT_AMOUNT";
+            "trace_id" => format!("{:?}", trace_id),
+            "function" => "EthereumLedgerSettlementEngine.handle_received_transactions()",
+            "SaveParam_account_id" => format!("{:?}", account_id),
+            "SaveParam_uncredited_settlement_amount" => format!("{:?}", (precision_loss.clone(), connector_scale.clone())),
+        );
 
         // Save any leftovers
         self.store

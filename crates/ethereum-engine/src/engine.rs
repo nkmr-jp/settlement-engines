@@ -323,10 +323,10 @@ where
             .map_err(move |err| error!("Could not fetch current block number {:?}", err))
             .await?;
 
-        let request_id = chrono::Local::now().timestamp_nanos(); // debug param
+        let trace_id = chrono::Local::now().timestamp_nanos(); // debug param
 
         sinfo!(&LOGGING.logger, "ETH_BLOCK_NUMBER";
-            "request_id" => format!("{:?}", request_id),
+            "trace_id" => format!("{:?}", trace_id),
             "function" => "EthereumLedgerSettlementEngine.handle_received_transactions()",
             "JsonRPC_method" => "eth_blockNumber", // refs: https://eth.wiki/json-rpc/API
             "JsonRPC_execute_code" => "https://github.com/tomusdrw/rust-web3/blob/bfdec4/src/api/eth.rs#L38",
@@ -386,7 +386,7 @@ where
                     .compat()
                     .await?;
                 sinfo!(&LOGGING.logger, "ETH_GET_BLOCK_BY_NUMBER";
-                    "request_id" => format!("{:?}", request_id),
+                    "trace_id" => format!("{:?}", trace_id),
                     "function" => "EthereumLedgerSettlementEngine.handle_received_transactions()",
                     "JsonRPC_method" => "eth_getBlockByNumber", // refs: https://eth.wiki/json-rpc/API
                     "JsonRPC_execute_code" => "https://github.com/tomusdrw/rust-web3/blob/bfdec4/src/api/eth.rs#L132",
@@ -404,7 +404,7 @@ where
         // now that all transactions have been processed successfully, we
         // can save `to_block` as the latest observed block
         sinfo!(&LOGGING.logger, "SAVE_RECENTLY_OBSERVED_BLOCK";
-            "request_id" => format!("{:?}", request_id),
+            "trace_id" => format!("{:?}", trace_id),
             "function" => "EthereumLedgerSettlementEngine.handle_received_transactions()",
             "SaveParam_net_version"=> format!("{:?}", net_version),
             "SaveParam_to_block"=> format!("{:?}", to_block),
@@ -501,7 +501,7 @@ where
             format!("{:?}", tx_hash)
         );
 
-        let request_id = chrono::Local::now().timestamp_nanos(); // debug param
+        let trace_id = chrono::Local::now().timestamp_nanos(); // debug param
 
         let account_id_clone = account_id.clone();
         let amount_clone = amount.clone();
@@ -513,7 +513,7 @@ where
             let body = &json!(Quantity::new(amount.clone(), engine_scale));
 
             sinfo!(&LOGGING.logger, "NOTIFY_CONNECTOR_REQUEST";
-                "request_id" => format!("{:?}", request_id),
+                "trace_id" => format!("{:?}", trace_id),
                 "function" => "EthereumLedgerSettlementEngine.notify_connector()",
                 "HttpRequest_url" => format!("{:?}", url.as_ref()),
                 "HttpRequest_header_Idempotency-Key" => format!("{:?}", tx_hash),
@@ -523,7 +523,7 @@ where
             client
                 .post(url.as_ref())
                 .header("Idempotency-Key", format!("{:?}", tx_hash))
-                .header("request_id", format!("{:?}", request_id))
+                .header("trace_id", format!("{:?}", trace_id))
                 .json(body)
                 .send()
                 .map_err(move |err| {
@@ -544,7 +544,7 @@ where
             })
             .await?;
         sinfo!(&LOGGING.logger, "NOTIFY_CONNECTOR_RESPONSE";
-                "request_id" => format!("{:?}", request_id),
+                "trace_id" => format!("{:?}", trace_id),
                 "function" => "EthereumLedgerSettlementEngine.notify_connector()",
                 "HttpResponse" => format!("{:?}", ret),
             );
@@ -573,7 +573,7 @@ where
         to: Address,
         amount: U256,
         token_address: Option<Address>,
-        request_id: i64,
+        trace_id: i64,
     ) -> Result<Option<H256>, ()> {
         if amount == U256::from(0) {
             return Ok(None);
@@ -599,7 +599,7 @@ where
             .await?;
 
         sinfo!(&LOGGING.logger, "ETH_GAS_PRICE";
-            "request_id" => format!("{:?}", request_id),
+            "trace_id" => format!("{:?}", trace_id),
             "function" => "EthereumLedgerSettlementEngine.settle_to()",
             "JsonRPC_method" => "eth_gasPrice", // refs: https://eth.wiki/json-rpc/API
             "JsonRPC_execute_code" => "https://github.com/tomusdrw/rust-web3/blob/bfdec4/src/api/eth.rs#L86",
@@ -632,7 +632,7 @@ where
             Err(_) => U256::from(100_000),
         };
         sinfo!(&LOGGING.logger, "ETH_ESTIMATE_GAS";
-            "request_id" => format!("{:?}", request_id),
+            "trace_id" => format!("{:?}", trace_id),
             "function" => "EthereumLedgerSettlementEngine.settle_to()",
             "JsonRPC_method" => "eth_estimateGas", // refs: https://eth.wiki/json-rpc/API
             "JsonRPC_execute_code" => "https://github.com/tomusdrw/rust-web3/blob/bfdec4/src/api/eth.rs#L81",
@@ -647,7 +647,7 @@ where
             .await?;
 
         sinfo!(&LOGGING.logger, "ETH_GET_TRANSACTION_COUNT";
-            "request_id" => format!("{:?}", request_id),
+            "trace_id" => format!("{:?}", trace_id),
             "function" => "EthereumLedgerSettlementEngine.settle_to()",
             "JsonRPC_method" => "eth_getTransactionCount", // refs: https://eth.wiki/json-rpc/API
             "JsonRPC_execute_code" => "https://github.com/tomusdrw/rust-web3/blob/bfdec4/src/api/eth.rs#L188",
@@ -682,7 +682,7 @@ where
         .await?;
 
         sinfo!(&LOGGING.logger, "ETH_SEND_RAW_TRANSACTION_REQUEST";
-            "request_id" => format!("{:?}", request_id),
+            "trace_id" => format!("{:?}", trace_id),
             "function" => "EthereumLedgerSettlementEngine.settle_to()",
             "tx" => format!("{:?}", tx),
             "signed_tx" => format!("{:?}", hex::encode(&signed_tx_clone)),
